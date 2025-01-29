@@ -1,0 +1,7 @@
+
+services:
+  code:
+    build: .
+    volumes:
+      - .:/code
+    tty: true

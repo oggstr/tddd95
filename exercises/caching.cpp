@@ -27,11 +27,13 @@ int main()
 
     cin >> C >> N >> A;
 
+    // Read input and initialize next_access
     for (int i = 0; i < A; ++i) {
         cin >> input[i];
         next_access[input[i]].push(i);
     }
 
+    // Add oo (INT_MAX) as last elem for all next_access queues
     for (int i = 0; i < N; ++i) {
         next_access[i].pop();
         next_access[i].push(oo);
@@ -40,6 +42,8 @@ int main()
     int misses = 0;
     int items_cached = 0;
 
+    // Priority queue for cache eviction
+    // Stores the index (into input) of next accesses
     priority_queue<int, vector<int>, less<int>> pq;
     for (int i = 0; i < A; ++i) {
 

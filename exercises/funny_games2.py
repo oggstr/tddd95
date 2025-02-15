@@ -1,6 +1,6 @@
 """
 @author Oskar Arensmeier
-@date 2024-02-11
+@date 2024-02-14
 """
 
 import sys
@@ -11,23 +11,22 @@ for _ in range(n):
 
     problem = sys.stdin.readline().strip().split()
 
-    start_state = float(problem[0])
-    k           = int(problem[1])
-    transitions = list(map(float, problem[2:]))
+    X = float(problem[0])
+    K = int(problem[1])
+    F = list(map(lambda x : 1/x if x > 0.0 else 99999, map(float, problem[2:]))) # 1 / f    
 
-    max_val = max(transitions)
-    min_val = min(transitions)
+    F.sort()
 
-    i = 0
-    min_range = 1.0
-    max_range = 1.0
-    while not (min_range <= start_state <= max_range):
-        i += 1
-        min_range = min_range / max_val
-        max_range = max_range / min_val
+    ranges = [(1, F[-1])]
+    while not (ranges[-1][0] < X <= ranges[-1][1]):
+        ranges.append(
+            (
+                ranges[-1][1],
+                ranges[-1][1] * F[0]
+            )
+        )
 
-    print(i)
-    if i % 2 == 1:
+    if len(ranges) % 2 == 1:
         print("Nils")
     else:
         print("Mikael")

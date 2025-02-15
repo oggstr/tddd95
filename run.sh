@@ -54,7 +54,7 @@ comp() {
 
     local path="$1"
     local file="$2"
-    g++ -O2 -o "$path/sol" -std=gnu++23 -static -lrt -Wl,--whole-archive -lpthread -Wl,--no-whole-archive "$path/$file.cpp"
+    g++-14 -O2 -o "$path/sol" -std=gnu++23 -static -lrt -Wl,--whole-archive -lpthread -Wl,--no-whole-archive "$path/$file.cpp"
 
     #g++-14 -O2 -o "$path/sol" -std=gnu++23 "$path/$file.cpp"
     #clang++ -O2 -o "$path/sol" -std=c++23 -pthread "$path/$file.cpp"

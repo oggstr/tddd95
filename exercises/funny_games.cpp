@@ -1,60 +1,82 @@
 /**
  * @author Oskar Arensmeier
- * @date 2024-02-10
+ * @date 2024-02-12
  */
 #include <algorithm>
 #include <iostream>
 #include <vector>
 #include <cmath>
 #include <unordered_map>
+#include <inttypes.h>
 #include <list>
 
 using namespace std;
 
-const int NILS_WIN   =  1;
-const int MIKAEL_WIN = -1;
+// Avoid padding in struct
+#pragma pack(push, 1)
+struct State {
+    // Low 32 bits (6*5 = 30)
+    int32_t state_32;
+    // High 8 bits
+    int8_t  state_8;
 
-//unordered_map<size_t, char> memo;
+    State() : state_32(0), state_8(0) {}
+    State(int32_t state_32, int8_t state_8) : state_32(state_32), state_8(state_8) {}
 
-class LruCache
-{
-public:
-LruCache(size_t capacity) : capacity(capacity) {}
-
-int get(size_t key) {
-    lru.remove(key);
-    lru.push_front(key);
-
-    return (int) cache[key];
-}
-
-bool has(size_t key) {
-    cout << "Hit " << key << "Size " << cache.size() << endl;
-    return cache.find(key) != cache.end();
-}
-
-void put(size_t key, char value) {
-    if (cache.size() == capacity) {
-        cache.erase(lru.back());
-        lru.pop_back();
+    bool operator==(const State & other) const
+    {
+        return state_32 == other.state_32 && state_8 == other.state_8;
     }
 
-    cache[key] = value;
-    lru.push_front(key);
-}
+    State add(int i)
+    {
+        int32_t new_state_32 = state_32;
+        int8_t  new_state_8  = state_8;
+        if (i < 5) {
+            new_state_32 += (1 << (6*i));
+        } else {
+            new_state_8 += 1;
+        }
 
-private:
-size_t capacity;
-unordered_map<size_t, char> cache;
-list<size_t> lru;
+        return State(new_state_32, new_state_8);
+    }
 
+    void print_state()
+    {
+        for (int i = 0; i < 5; ++i) {
+            cout << ((state_32 >> (6*i)) & 0b111111) << " ";
+        }
+        cout << (int) state_8 << endl;
+    }
+};
+#pragma pack(pop)
+
+struct StateHash {
+    size_t operator()(const State & state) const
+    {
+        uint64_t combined = (static_cast<uint64_t>(state.state_32)) | (static_cast<uint64_t>(state.state_8) << 32);
+        return hash<uint64_t>{}(combined);
+    }
 };
 
-int dfs(
-    LruCache & cache,
+inline bool should_cache(const State & s)
+{
+    return true;
+    size_t sum = 0;
+    for (int i = 0; i < 5; ++i) {
+        sum += (s.state_32 >> (6*i)) & 0b111111;
+    }
+    sum += s.state_8;
+
+    // Cache only 3/4 of the states
+    return (sum % 20 < 15);
+}
+
+bool dfs(
+    unordered_map<State, bool, StateHash> & memo,
     vector<double> & transitions,
-    size_t state_key,
-    double state,
+    State state,
+    double value,
     bool is_nils
 ) {
     /**
@@ -65,59 +87,45 @@ int dfs(
      *
      * Since we can have at most 6 transitions, we need 6 * 6 = 36 bits to represent the state_key.
      */
-    if (cache.has(state_key)) {
-        return cache.get(state_key);
+    if (memo.find(state) != memo.end()) {
+        return memo[state];
     }
 
-
-    if (state <= 0.0) {
-        return is_nils ? MIKAEL_WIN : NILS_WIN;
-    }
-
-    if (is_nils) {
-        int best = -2;
-        for (int i = 0; i < transitions.size(); i++) {
-            best = max(
-                best,
-                dfs(
-                    cache,
-                    transitions,
-                    state_key + (1 << 6*i),
-                    state + transitions[i],
-                    !is_nils
-                )
-            );
+    if (transitions[0] * value <= 1.0) {
+        if (should_cache(state)) {
+            memo[state] = is_nils;
         }
-
-        cache.put(state_key, best);
-        return best;
-    } else {
-        int best = 2;
-        for (int i = 0; i < transitions.size(); i++) {
-            best = min(
-                best,
-                dfs(
-                    cache,
-                    transitions,
-                    state_key + (1 << 6*i),
-                    state + transitions[i],
-                    !is_nils
-                )
-            );
-        }
-
-        cache.put(state_key, best);
-        return best;
+        return is_nils;
     }
+
+    for (int i = 0; i < transitions.size(); i++) {
+
+        State new_state = state.add(i);
+        if (dfs(memo, transitions, new_state, value * transitions[i], !is_nils) == is_nils) {
+
+            if (should_cache(state)) {
+                memo[state] = is_nils;
+            }
+
+            return is_nils;
+        }
+    }
+
+    if (should_cache(state)) {
+        memo[state] = !is_nils;
+    }
+    return !is_nils;
 }
 
 int main() {
     int n;
 
+    cin.sync_with_stdio(false);
+    cin.tie(nullptr);
+
     cin >> n;
     for (int i = 0; i < n; i++) {
-        //unordered_map<size_t, char> memo;
-        LruCache cache(10000000000);
+        unordered_map<State, bool, StateHash> memo;
 
         double start;
         int k;
@@ -130,21 +138,18 @@ int main() {
             cin >> transitions[j];
         }
 
-        start = log(start);
+        sort(transitions.begin(), transitions.end(), less<double>());
 
-        transform(transitions.begin(), transitions.end(), transitions.begin(), [](auto t) {
-            return log(t);
-        });
-
-        //int result = alpha_beta_search(transitions, 0, start, true, -2, 2);
-        int result = dfs(cache, transitions, 0, start, true);
-
-        if (result == NILS_WIN) {
+        if (dfs(memo, transitions, State(0, 0), start, true)) {
             cout << "Nils\n";
         } else {
             cout << "Mikael\n";
         }
 
-        cout << flush;
+        //cout << "Cache size: " << memo.size() << endl;
+        //cout << flush;
     }
+
+    cout << flush;
+    return 0;
 }

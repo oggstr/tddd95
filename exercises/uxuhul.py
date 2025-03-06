@@ -3,8 +3,6 @@
 @date: 2024-02-09
 """
 
-from typing import Callable
-from functools import lru_cache
 import sys
 
 OUTPUT = ["NNN", "NNY", "NYN", "NYY", "YNN", "YNY", "YYN", "YYY"]

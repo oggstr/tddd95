@@ -36,6 +36,7 @@ usage() {
     echo "comp - compile"
     echo "run - run"
     echo "comprun - compile and run"
+    echo "complocal - compile using clang++"
 }
 
 # Compile and run
@@ -44,6 +45,17 @@ usage() {
 comp_and_run() {
     comp $1 $2
     run $1 $2
+}
+
+comp_local() {
+    if [ "$#" -ne 2 ]; then
+        echo "Expected 2 args, got: $#"
+        exit 1
+    fi
+
+    local path="$1"
+    local file="$2"
+    clang++ -g -O2 -o "$path/sol" -std=c++23 -pthread "$path/$file.cpp"
 }
 
 comp() {
@@ -55,9 +67,6 @@ comp() {
     local path="$1"
     local file="$2"
     g++-14 -O2 -o "$path/sol" -std=gnu++23 -static -lrt -Wl,--whole-archive -lpthread -Wl,--no-whole-archive "$path/$file.cpp"
-
-    #g++-14 -O2 -o "$path/sol" -std=gnu++23 "$path/$file.cpp"
-    #clang++ -O2 -o "$path/sol" -std=c++23 -pthread "$path/$file.cpp"
 }
 
 run() {
@@ -117,6 +126,9 @@ case $2 in
     ;;
     comprun)
         comp_and_run $code_path $file_name
+    ;;
+    complocal)
+        comp_local $code_path $file_name
     ;;
     *)
         echo "Unknown sub command"

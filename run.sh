@@ -106,6 +106,9 @@ case $1 in
             echo "Expected 3 arguments, got: $#"
             exit 1
         fi
+
+        code_path="$SCRIPT_DIR/lab"
+        file_name=$3
     ;;
     *)
         echo "Unknown command"

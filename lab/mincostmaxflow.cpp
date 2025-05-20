@@ -2,7 +2,7 @@
 #include <vector>
 #include <limits>
 #include <queue>
-// #include "../util/bellmanford.cpp"
+#include "../util/bellmanford.cpp"
 
 using namespace std;
 
@@ -77,26 +77,49 @@ public:
         for (auto & e : edges) {
             adj[e.u].push_back(e.v);
             adj[e.v].push_back(e.u);
-
+            
             cost[e.u][e.v] = e.cost;
             cost[e.v][e.u] = -e.cost;
-
+            
             cap[e.u][e.v] = e.cap;
+        }
+
+        vector<ll> potentials(n, 0);
+        {
+            BellmanFord::Graph graph(n, edges.size());
+            for (auto & e : edges) {
+                graph.add_edge(e.u, e.v, e.cost);
+            }
+
+            BellmanFord::BellmanFord bf(move(graph), src);
+            bf.run();
+            potentials = bf.dist;
         }
 
         // Total flow and cost
         int total_flow = 0;
         int total_cost = 0;
-
+        
         vector<ll> dist;
         vector<int> parent;
-
+        
         while (total_flow < K) {
-            shortest_paths(src, adj, cost, cap, dist, parent);
+            dijkstra(src, adj, cost, cap, dist, parent, potentials);
 
             // Check if no augmenting paths
             if (dist[sink] == INF) {
                 break;
+            }
+
+            // Update potentials by offsetting
+            // by new distances - this ensures
+            // dijkstra can be run again
+            for (int i = 0; i < n; ++i) {
+                if (dist[i] == INF) {
+                    continue;
+                }
+
+                potentials[i] += dist[i];
             }
 
             // Find max flow on augmenting path
@@ -108,14 +131,17 @@ public:
             }
 
             total_flow += f;
-            total_cost += f * dist[sink];
 
             // Adjust capacities according to
             // altered flow
             curr = sink;
             while (curr != src) {
+
                 cap[parent[curr]][curr] -= f;
                 cap[curr][parent[curr]] += f;
+
+                total_cost += f * cost[parent[curr]][curr];
+
                 curr = parent[curr];
             }
         }
@@ -132,8 +158,45 @@ private:
         vector<vector<int>> & cap,
         vector<ll> & dist,
         vector<int> & parent,
-        vector<int> & potentials
-    ) {}
+        vector<ll> & potentials
+    ) {
+        dist.assign(n, INF);
+        parent.assign(n, -1);
+
+        dist[src] = 0;
+
+        priority_queue<
+            pair<ll, int>,
+            vector<pair<ll, int>>,
+            greater<pair<ll, int>>
+        > pq;
+        pq.push({0, src});
+
+        while (! pq.empty()) {
+            auto [d, u] = pq.top();
+            pq.pop();
+            
+            // Already processed better path
+            if (d > dist[u]) {
+                continue;
+            }
+
+            for (int v : adj[u]) {
+                if (cap[u][v] <= 0) {
+                    continue;
+                }
+
+                ll alt = dist[u] + ((ll) cost[u][v]) + potentials[u] - potentials[v];
+                if (alt >= dist[v]) {
+                    continue;
+                }
+
+                dist[v] = alt;
+                parent[v] = u;
+                pq.push({alt, v});
+            }
+        }
+    }
 
     void shortest_paths(
         int src,

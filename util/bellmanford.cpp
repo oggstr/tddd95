@@ -9,7 +9,7 @@ using namespace std;
 using ll = long long int;
 using llu = long long unsigned;
 
-const ll INF = numeric_limits<ll>::max();
+const ll INF = numeric_limits<ll>::max() / 2;
 
 /**
  * Models a directed edge
@@ -236,42 +236,6 @@ public:
         }
 
         return dist[end];
-    }
-private:
-
-    /**
-     * Mark nodes reachable from the negative cycle
-     *
-     * @param neg_cycle Negative cycle
-     */
-    void mark_negative_nodes(vector<int> & neg_cycle)
-    {
-        vector<bool> visited(G.N, false);
-        queue<int> q;
-
-        // Mark nodes directly in the cycle
-        for (auto u : neg_cycle) {
-            q.push(u);
-            visited[u] = true;
-            dist[u] = -INF;
-        }
-        
-        // Mark nodes reachable from the cycle
-        // BFS
-        while (!q.empty()) {
-            int u = q.front();
-            q.pop();
-
-            for (auto e : G.neighbors(u)) {
-                if (visited[e.v]) {
-                    continue;
-                }
-
-                q.push(e.v);
-                visited[e.v] = true;
-                dist[e.v] = -INF;
-            }
-        }
     }
 };
 };

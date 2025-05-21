@@ -4,6 +4,47 @@
 #include <queue>
 #include "../util/bellmanford.cpp"
 
+/**
+ * @author Oskar Arensmeier
+ * @date 2025-05-21
+ */
+
+/**
+ * Implementation of successive shortest path for
+ * multi graphs using potentials (through Bellman-Ford) to
+ * allow for dijkstra to be used. Solves min cost max flow.
+ *
+ * Algorithm:
+ * The algorithm is in large parts based on: https://cp-algorithms.com/graph/min_cost_flow.html
+ *
+ * We start by creating a residual graph where back edges are
+ * added for each edge (with negative cost and 0 capcity).
+ * We then go on to run Bellman-Ford to find the shortest path
+ * from the source to all other nodes. This is used to
+ * initialize the potentials for the dijkstra algorithm.
+ *
+ * The core of the algorithms runs dijkstra to find an augmenting
+ * path. Once there are no more augmenting paths, we stop.
+ *
+ * Time complexity:
+ * - O(m * n) Pre-processing (running Bellman-Ford)
+ * - O(m * log(n)) For the core algorithm
+ * 
+ * Total: O(m * n + m * log(n))
+ *
+ * Where n is nodes and m is edges.
+ *
+ * Space complexity:
+ * - O(n * m) for the adjacency list
+ * - O(n) for the distance, parent and potential arrays
+ * 
+ * Total: O(n * m + n) = O(n * m)
+ * 
+ * Data structures:
+ * - Adjacency list using vectors
+ * - Vectors for the distance, parent and potential arrays
+ */
+
 using namespace std;
 
 using ll = long long;
@@ -15,12 +56,12 @@ public:
     /**
      * From vertex
      */
-    int v;
+    int u;
 
     /**
      * To vertex
      */
-    int u;
+    int v;
 
     /**
      * Cost
@@ -31,6 +72,9 @@ public:
      * Capacity
      */
     int cap;
+
+    Edge(int u, int v, int cost, int cap) : u(u), v(v), cost(cost), cap(cap)
+    {}
 };
 
 /**
@@ -44,6 +88,54 @@ using EdgeList = vector<Edge>;
 class SSP {
 
 public:
+    class ResidualEdge {
+    public:
+        /**
+         * Target node
+         */
+        int to;
+
+        /**
+         * Index in adjacency list
+         * of the reverse edge
+         */
+        int rev_idx;
+
+        /**
+         * Cost
+         */
+        int cost;
+
+        /**
+         * Capacity
+         */
+        int cap;
+
+        ResidualEdge(int to, int rev_idx, int cost, int cap) :
+            to(to), rev_idx(rev_idx), cost(cost), cap(cap)
+        {}
+    };
+
+    /**
+     * Result of running the algorithm
+     */
+    class Result {
+    public:
+        /**
+         * Flow
+         */
+        int flow;
+
+        /**
+         * Cost
+         */
+        int cost;
+
+        /**
+         * Flow matrix
+         */
+        vector<vector<int>> flow_graph;
+    };
 
     /**
      * Edges
@@ -55,6 +147,12 @@ public:
      */
     int n;
 
+    /**
+     * Constructor
+     *
+     * @param n Number of nodes
+     * @param edges List of edges
+     */
     SSP(int n, EdgeList edges) : n(n), edges(edges)
     {}
 
@@ -64,47 +162,42 @@ public:
      * @param src Source
      * @param sink Sink
      * @param K Limit flow - default INF, for max flow
+     * @return {flow, cost, flow matrix}
      */
-    pair<int, int> min_cost_max_flow(
+    Result min_cost_max_flow(
         int src,
         int sink,
         int K = numeric_limits<int>::max()
     ) {
-        vector<vector<int>> adj(n, vector<int>());
-        vector<vector<int>> cost(n, vector<int>(n, 0));
-        vector<vector<int>> cap(n, vector<int>(n, 0));
+        // Multi graph adjacency list of original
+        // and residual edges
+        vector<vector<ResidualEdge>> adj(n);
 
         for (auto & e : edges) {
-            adj[e.u].push_back(e.v);
-            adj[e.v].push_back(e.u);
-            
-            cost[e.u][e.v] = e.cost;
-            cost[e.v][e.u] = -e.cost;
-            
-            cap[e.u][e.v] = e.cap;
+            int u_idx = adj[e.u].size();
+            int v_idx = adj[e.v].size();
+
+            adj[e.u].emplace_back(e.v, v_idx, e.cost, e.cap);
+            adj[e.v].emplace_back(e.u, u_idx, -e.cost, 0);
         }
 
-        vector<ll> potentials(n, 0);
-        {
-            BellmanFord::Graph graph(n, edges.size());
-            for (auto & e : edges) {
-                graph.add_edge(e.u, e.v, e.cost);
-            }
+        /* 
+        parent[v] = {u, idx},
+        Where adj[v][idx] = parent edge of v.
+        
+        This is important since the graph is a multi graph,
+        and we need to know exactly which edge was used by dijkstra.
+        */
+        vector<pair<int, int>> parent;
 
-            BellmanFord::BellmanFord bf(move(graph), src);
-            bf.run();
-            potentials = bf.dist;
-        }
+        vector<ll> dist;
+        vector<vector<int>> flow(n, vector<int>(n, 0)); // Flow matrix
+        vector<ll> potentials = compute_potentials(src, adj);
 
-        // Total flow and cost
         int total_flow = 0;
         int total_cost = 0;
-        
-        vector<ll> dist;
-        vector<int> parent;
-        
         while (total_flow < K) {
-            dijkstra(src, adj, cost, cap, dist, parent, potentials);
+            dijkstra(src, adj, dist, parent, potentials);
 
             // Check if no augmenting paths
             if (dist[sink] == INF) {
@@ -126,8 +219,11 @@ public:
             int f = K - total_flow;
             int curr = sink;
             while (curr != src) {
-                f = min(f, cap[parent[curr]][curr]);
-                curr = parent[curr];
+                int prev = parent[curr].first;
+                int idx = parent[curr].second;
+
+                f = min(f, adj[prev][idx].cap);
+                curr = prev;
             }
 
             total_flow += f;
@@ -136,32 +232,46 @@ public:
             // altered flow
             curr = sink;
             while (curr != src) {
+                int prev = parent[curr].first;
+                int idx = parent[curr].second;
+                int idx_rev = adj[prev][idx].rev_idx;
 
-                cap[parent[curr]][curr] -= f;
-                cap[curr][parent[curr]] += f;
+                // Adjust capacities
+                adj[prev][idx].cap -= f;
+                adj[curr][idx_rev].cap += f;
 
-                total_cost += f * cost[parent[curr]][curr];
+                // Adjust flows
+                flow[prev][curr] += f;
+                flow[curr][prev] = max(flow[curr][prev] - f, 0);
 
-                curr = parent[curr];
+                total_cost += f * adj[prev][idx].cost;
+
+                curr = prev;
             }
         }
 
-        return {total_flow, total_cost};
+        return {total_flow, total_cost, move(flow)};
     }
 
 private:
-
+    /**
+     * Dijkstra algorithm
+     *
+     * @param src Source node
+     * @param adj Adjacency list
+     * @param dist Distance array
+     * @param parent Parent array
+     * @param potentials Potentials
+     */
     void dijkstra(
         int src,
-        vector<vector<int>> & adj,
-        vector<vector<int>> & cost,
-        vector<vector<int>> & cap,
+        vector<vector<ResidualEdge>> & adj,
         vector<ll> & dist,
-        vector<int> & parent,
+        vector<pair<int, int>> & parent,
         vector<ll> & potentials
     ) {
         dist.assign(n, INF);
-        parent.assign(n, -1);
+        parent.assign(n, {-1, -1});
 
         dist[src] = 0;
 
@@ -181,62 +291,45 @@ private:
                 continue;
             }
 
-            for (int v : adj[u]) {
-                if (cap[u][v] <= 0) {
+            for (int i = 0; i < adj[u].size(); ++i) {
+                auto & e = adj[u][i];
+
+                if (e.cap <= 0) {
                     continue;
                 }
 
-                ll alt = dist[u] + ((ll) cost[u][v]) + potentials[u] - potentials[v];
-                if (alt >= dist[v]) {
+                ll alt = dist[u] + ((ll) e.cost) + potentials[u] - potentials[e.to];
+                if (alt >= dist[e.to]) {
                     continue;
                 }
 
-                dist[v] = alt;
-                parent[v] = u;
-                pq.push({alt, v});
+                dist[e.to] = alt;
+                parent[e.to] = {u, i};
+                pq.push({alt, e.to});
             }
         }
     }
 
-    void shortest_paths(
+    /**
+     * Compute potentials for the dijkstra algorithm
+     * using Bellman-Ford.
+     * 
+     * @param adj Adjacency list
+     * @return Potentials
+     */
+    vector<ll> compute_potentials(
         int src,
-        vector<vector<int>> & adj,
-        vector<vector<int>> & cost,
-        vector<vector<int>> & cap,
-        vector<ll> & dist,
-        vector<int> & parent
+        vector<vector<ResidualEdge>> & adj
     ) {
-        parent.assign(n, -1);
-
-        dist.assign(n, INF);
-        dist[src] = 0;
-
-        vector<bool> in_queue(n, false);
-        queue<int> q;
-
-        q.push(src);
-        while (! q.empty()) {
-            int u = q.front();
-            q.pop();
-
-            in_queue[u] = false;
-
-            for (int v : adj[u]) {
-
-                // Skip if no capacity or this path is worse
-                if (cap[u][v] <= 0 ||
-                    dist[v] <= dist[u] + (ll) cost[u][v]) {
-                    continue;
-                }
-                dist[v] = dist[u] + cost[u][v];
-                parent[v] = u;
-
-                if (! in_queue[v]) {
-                    q.push(v);
-                    in_queue[v] = true;
-                }
-            }
+        BellmanFord::Graph graph(n, edges.size());
+        for (auto & e : edges) {
+            graph.add_edge(e.u, e.v, e.cost);
         }
+
+        BellmanFord::BellmanFord bf(move(graph), src);
+        bf.run();
+
+        return bf.dist;
     }
 };
 
@@ -248,15 +341,18 @@ int main()
     int n, m, s, t;
     cin >> n >> m >> s >> t;
 
-    EdgeList edges(m);
+    EdgeList edges;
     for (int i = 0; i < m; ++i) {
-        cin >> edges[i].u >> edges[i].v >> edges[i].cap >> edges[i].cost;
+        int u, v, cap, cost;
+        cin >> u >> v >> cap >> cost;
+
+        edges.push_back({u, v, cost, cap});
     }
 
     SSP ssp(n, edges);
-    auto [flow, cost] = ssp.min_cost_max_flow(s, t);
+    auto res = ssp.min_cost_max_flow(s, t);
 
-    cout << flow << " " << cost << "\n";
+    cout << res.flow << " " << res.cost << "\n";
     cout << flush;
 
     return 0;

@@ -2,6 +2,34 @@
 #include <vector>
 #include <string>
 
+/**
+ * @author Oskar Arensmeier
+ * @date 2025-05-25
+ */
+
+/**
+ * Suffix array implementation
+ * Reference: https://cp-algorithms.com/string/suffix-array.html
+ *
+ * Algorithm:
+ * 0. Append unique char as end marker: 0x1
+ * 1. Sort cyclic shifts using counting sort
+ * 2. Create equivalence classes based on first char
+ * 3. For each h, sort cyclic shifts of length 2^h
+ * 4. Use prev equivalence classes to sort current cyclic shifts
+ * 5. Repeat until 2^h >= n
+ * 
+ * Time complexity:
+ * O(n log n)
+ * where n is the length of the string
+ * 
+ * Space complexity:
+ * O(n)
+ * 
+ * Usage:
+ * Only supporting ASCII characters!
+ */
+
 using namespace std;
 
 class SuffixArray {
@@ -15,19 +43,30 @@ public:
  */
 vector<int> suffix;
 
+/**
+ * Constructor
+ *
+ * @param str String
+ */
 SuffixArray(const string & str)
 {
     // Append unique char
     this->str = str + (char) 0x1;
     this->suffix = sort_cyclic_shifts(this->str);
 
-    // Remove '$'
+    // Remove '0x1'
     this->suffix.erase(this->suffix.begin());
 }
 
+/**
+ * Get index of i-th suffix
+ *
+ * @param i i-th suffix
+ * @return suffix index
+ */
 int get_suffix(int i) const
 {
-    if (i < 0 || i >= str.size()-1) {
+    if (i < 0 || i >= suffix.size()) {
         throw out_of_range("Index out of range");
     }
 
@@ -48,9 +87,14 @@ string str;
  */
 vector<int> sort_cyclic_shifts(string const& s) {
     int n = s.size();
-    vector<int> perm(n);               // Permutation of indices
-    vector<int> cls(n);                // Equivalence classes
-    vector<int> cnt(ALPHABET_SIZE, 0); // Count of chars - for count sort
+    vector<int> perm(n);                       // Permutation of indices
+    vector<int> cls(n);                        // Equivalence classes
+    vector<int> cnt(max(ALPHABET_SIZE, n), 0); // Count of chars - for count sort
+
+    /* 
+    Inital phase sorts based on single char,
+    and creates first equivalence classes.
+    */
 
     for (int i = 0; i < n; i++) {
         cnt[s[i]]++;
@@ -74,6 +118,12 @@ vector<int> sort_cyclic_shifts(string const& s) {
 
     vector<int> perm_tmp(n);
     vector<int> cls_tmp(n);
+
+    /* 
+    Second phase continuously increases the length of the cyclic shifts
+    being sorted, doubling the length each iteration.
+    */
+
     for (int h = 0; (1 << h) < n; ++h) {
 
         for (int i = 0; i < n; i++) {
@@ -96,6 +146,7 @@ vector<int> sort_cyclic_shifts(string const& s) {
             perm[--cnt[cls[perm_tmp[i]]]] = perm_tmp[i];
         }
 
+        // Radix like idea using the previous equivalence classes
         cls_tmp[perm[0]] = 0;
         cls_count = 1;
         for (int i = 1; i < n; i++) {
@@ -150,8 +201,6 @@ int main()
         if (str.empty()) {
             break;
         }
-
-        //str += '\n';
 
         SuffixArray sa(str);
 

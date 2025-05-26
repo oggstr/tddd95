@@ -21,3 +21,5 @@ sol
 .vscode/
 
 sol.dSYM
+
+__pycache__/

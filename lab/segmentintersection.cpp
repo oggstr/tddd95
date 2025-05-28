@@ -2,11 +2,11 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <iomanip>
 
-/**
- * @author Oskar Arensmeier
- * @date 2025-05-28
- */
+/* 
+Does not work.
+*/
 
 using namespace std;
 using ll = long long;
@@ -18,7 +18,7 @@ using Point   = Vec2D;
 using Polygon = vector<Point>;
 using Segment = pair<Point, Point>;
 
-const double EPS = 10e-12;
+const double EPS = 10e-9;
 const double PI  = acos(-1.0);
 const double INF = 1e18;
 
@@ -65,16 +65,6 @@ Vec2D operator/(double scalar) const {
     return Vec2D(x / scalar, y / scalar);
 }
 /**
- * Assignment operator
- */
-Vec2D& operator=(const Vec2D & other) {
-    if (this != &other) {
-        x = other.x;
-        y = other.y;
-    }
-    return *this;
-}
-/**
  * Equality operator
  * @param other Vector
  */
@@ -105,97 +95,107 @@ double dot(const Vec2D& other) const {
 double dist(const Vec2D& other) const {
     return sqrt((x - other.x) * (x - other.x) + (y - other.y) * (y - other.y));
 }
-
-/**
- * Angle between this vector and another vector
- * @param other Vector
- */
-double angle(const Vec2D& other) const {
-    double dotProduct = dot(other);
-    double magnitudeA = sqrt(x * x + y * y);
-    double magnitudeB = sqrt(other.x * other.x + other.y * other.y);
-    return acos(dotProduct / (magnitudeA * magnitudeB));
-}
-
-/**
- * Normalize the vector
- * @return Normalized vector
- */
-Vec2D norm()
-{
-    double magnitude = sqrt(x * x + y * y);
-    if (magnitude < EPS) {
-        throw invalid_argument("Cannot normalize a zero vector");
-    }
-    return Vec2D(x / magnitude, y / magnitude);
-}
 };
 
-vector<Point> intersect_col(Segment s1, Segment s2)
-{
-    Vec2D u = s1.first - s2.first;
-    Vec2D v = s1.second - s1.first;
-
-    // Parallel
-    if (abs(v.cross(u)) > EPS) {
-        return {};
-    }
-
-    auto in_between = [](int a, int b, int x) 
-    {
-        return (a <= x && x <= b) || (b <= x && x <= a);
-    };
-
-    // Check for overlap
-    if (! in_between(s1.first.x, s1.second.x, s2.first.x) &&
-        ! in_between(s1.first.x, s1.second.x, s2.second.x) &&
-        ! in_between(s2.first.x, s2.second.x, s1.first.x) &&
-        ! in_between(s2.first.x, s2.second.x, s1.second.x)) {
-        return {};
-    }
-
-    vector<Point> result {s1.first, s1.second, s2.first, s2.second};
-    sort(result.begin(), result.end(), [](const Point& a, const Point& b) {
-        return a.x < b.x;
-    });
-
-    // Leave only overlap points
-    result.erase(result.begin());
-    result.pop_back();
-
-    // Overlap is a single point
-    if (result[0].dist(result[1]) < EPS) {
-        result.pop_back();
-    }
-
-    return result;
+/**
+ * Check if point p lies on the line segment s.
+ * @param p Point
+ * @param s Segment
+ * @return true/false
+ */
+bool is_on_segment(Point& p, Segment& s) {
+    return (p.x >= min(s.first.x, s.second.x) - EPS &&
+            p.x <= max(s.first.x, s.second.x) + EPS &&
+            p.y >= min(s.first.y, s.second.y) - EPS &&
+            p.y <= max(s.first.y, s.second.y) + EPS);
 }
 
+/**
+ * Find intersection between two line segments
+ * @param s1 First segment
+ * @param s2 Second segment
+ * @return Vector of intersection points (0, 1, or 2 points)
+ */
 vector<Point> intersect(Segment s1, Segment s2)
 {
-    Vec2D p = s1.first;
+    // line 1
+    Point p = s1.first;
     Vec2D r = s1.second - s1.first;
 
-    Vec2D q = s2.first;
+    // line 2
+    Point q = s2.first;
     Vec2D s = s2.second - s2.first;
 
-    // Segments are parallel/collinear
     double rXs = r.cross(s);
-    if (abs(rXs) < EPS) {
-        return intersect_col(s1, s2);
+    Vec2D pq = q - p;
+
+    // lines collinear if their direction vectors are parallel (rXs)
+    // and vector between their starting points (pq) is parallel to any line's direction
+    if (abs(rXs) < EPS && abs(pq.cross(r)) < EPS) {
+        // candidate points
+        vector<Point> pts;
+
+        if (is_on_segment(s1.first,  s2)) pts.push_back(s1.first);
+        if (is_on_segment(s1.second, s2)) pts.push_back(s1.second);
+        if (is_on_segment(s2.first,  s1)) pts.push_back(s2.first);
+        if (is_on_segment(s2.second, s1)) pts.push_back(s2.second);
+
+        // No overlap
+        if (pts.empty()) return {};
+
+        std::sort(pts.begin(), pts.end(), [](const Point& pt1, const Point& pt2)
+        {
+            // Prefer X
+            if (abs(pt1.x - pt2.x) > EPS) {
+                return pt1.x < pt2.x;
+            }
+
+            // X are equal
+            if (abs(pt1.y - pt2.y) > EPS) {
+                 return pt1.y < pt2.y;
+            }
+
+            return false;
+        });
+
+        // Remove duplicate points
+        pts.erase(std::unique(pts.begin(), pts.end(), [](Point pt1, Point pt2){
+            return abs(pt1.x - pt2.x) < EPS && abs(pt1.y - pt2.y) < EPS;
+        }), pts.end());
+
+        // Should be impossible
+        if (pts.empty()) return {};
+
+        // Point overlap
+        if (pts.size() == 1) return {pts[0]};
+        
+        // Segment overlap
+        return {pts.front(), pts.back()};
     }
 
-    Vec2D pq = q - p;
-    double t = pq.cross(s) / rXs;
-    double u = pq.cross(r) / rXs;
-
-    // Intersection point outside segments
-    if (t < 0 || t > 1 || u < 0 || u > 1) {
+    // Lines are parallel but NOT collinear
+    if (abs(rXs) < EPS) { 
         return {};
     }
 
-    Point res = p + r * t;
-    return {res};
+    // Single point intersect
+    // Solve for t and u: p + t * r = q + u * s
+    // t => s1, u => s2
+    double t = pq.cross(s) / rXs;
+    double u = pq.cross(r) / rXs; 
+
+    // Check intersect lies within both segments
+    if (t >= 0 - EPS &&
+        t <= 1 + EPS &&
+        u >= 0 - EPS &&
+        u <= 1 + EPS) 
+    {
+        Point intersection_point = p + r * t;
+        return {intersection_point};
+    }
+
+    // Lines intersect, segments do not
+    return {};
 }
 
 int main()
@@ -203,30 +203,36 @@ int main()
     cin.tie(nullptr);
     cin.sync_with_stdio(false);
 
-    int n;
-    cin >> n;
-    for (int i = 0; i < n; ++i) {
-        int x1, x2, x3, x4;
-        int y1, y2, y3, y4;
+    int n_cases;
+    cin >> n_cases;
+    for (int i = 0; i < n_cases; ++i) {
+        double x1, y1, x2, y2, x3, y3, x4, y4;
         cin >> x1 >> y1 >> x2 >> y2 >> x3 >> y3 >> x4 >> y4;
 
         Segment s1 = {Point(x1, y1), Point(x2, y2)};
         Segment s2 = {Point(x3, y3), Point(x4, y4)};
 
         vector<Point> result = intersect(s1, s2);
+
         if (result.empty()) {
             cout << "none" << '\n';
             continue;
         }
 
-        cout.precision(2);
-        cout << fixed;
+        // Avoid -0.0
+        auto abs_if_zero = [](double val) {
+            if (abs(val) < 5*1e-3) return 0.0;
+            return val;
+        };
+        
+        cout << fixed << setprecision(2);
         if (result.size() == 1) {
-            cout << result[0].x << ' ' << result[0].y << '\n';
-        } else {
-            cout << result[0].x << ' ' << result[0].y << ' '
-                 << result[1].x << ' ' << result[1].y << '\n';
+            cout << abs_if_zero(result[0].x) << ' ' << abs_if_zero(result[0].y) << '\n';
+            continue;
         }
+
+        cout << abs_if_zero(result[0].x) << ' ' << abs_if_zero(result[0].y) << ' '
+                << abs_if_zero(result[1].x) << ' ' << abs_if_zero(result[1].y) << '\n';
     }
 
     cout << flush;

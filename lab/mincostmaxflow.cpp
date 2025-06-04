@@ -15,35 +15,89 @@
  * allow for dijkstra to be used. Solves min cost max flow.
  *
  * Algorithm:
- * The algorithm is in large parts based on: https://cp-algorithms.com/graph/min_cost_flow.html
+ * The algorithm is in large parts based on:
+ * https://cp-algorithms.com/graph/min_cost_flow.html
  *
- * We start by creating a residual graph where back edges are
- * added for each edge (with negative cost and 0 capcity).
- * We then go on to run Bellman-Ford to find the shortest path
- * from the source to all other nodes. This is used to
- * initialize the potentials for the dijkstra algorithm.
+ * This algorithm is effectively a greedy. At each step in the core
+ * loop, we want to introduce some amount of flow, to do so we
+ * find the shortest path (cost wise) for it using dijkstra,
+ * and then modifying the solution by that path.
+ * 
+ * The key factors that ensures correctness are potentials and the residual graph.
+ * Potentials ensures dijkstra finds the shortest path despite (potentially) negative costs,
+ * by offsetting the costs by the potentials.
+ * The residual graph allow dijkstra to find paths that can 'cancel' flow, i.e. reverse flow.
  *
- * The core of the algorithms runs dijkstra to find an augmenting
- * path. Once there are no more augmenting paths, we stop.
+ * Init
+ * 1. Create residual (multi) graph from the original edges.
+ * 2. Run Bellman-Ford to compute inital potentials.
+ *
+ * Core loop
+ * 3. While a dijkstra returns a shortest path:
+ *    (If no path, break)
+ * 4. Find max flow along that path
+ * 5. Adjust residual graph capacities and flow matrix
+ * 6. Update total flow and cost
+ * 7. Update potentials by adding the new distances from dijkstra
+ *   (This ensures dijkstra can be run again)
+ * 8. Repeat from step 3.
  *
  * Time complexity:
  * - O(m * n) Pre-processing (running Bellman-Ford)
- * - O(m * log(n)) For the core algorithm
- * 
- * Total: O(m * n + m * log(n))
+ * - O(F * m * log(n)) For the core algorithm (we may run dijkstra F times)
  *
- * Where n is nodes and m is edges.
+ * Total: O(m * n + F * m * log(n))
+ *
+ * Where n is nodes, m is edges and F is the maximum flow.
  *
  * Space complexity:
- * - O(n * m) for the adjacency list
+ * - O(m) for the adjacency list
  * - O(n) for the distance, parent and potential arrays
+ * - O(n^2) for the flow matrix
  * 
- * Total: O(n * m + n) = O(n * m)
+ * Total: O(m + n + n^2) = O(m + n^2)
+ *
+ * Where n is nodes and m is edges.
  * 
  * Data structures:
  * - Adjacency list using vectors
  * - Vectors for the distance, parent and potential arrays
  */
+
+/* Answers - Complementary work 
+
+# The time complexity stated is incorrect, why?
+
+Corrected to O(m * n + F * m * log(n)). Previously, it forgot to consider
+the amount of times dijkstra may run - which is F, the maximum flow.
+
+
+
+# The memory complexity stated is incorrect, why?
+
+Corrected to O(m + n^2). Previously, it forgot to consider the flow matrix
+and incorrectly stated adjacency list as O(n + m).
+
+
+
+# Why can we guarantee that the dijkstras does not get stuck in a
+# negative cycle or that there are none to get stuck in?
+
+Potentials transform all edge costs to be non negative through:
+offset_cost = cost + potential[u] - potential[v]. Since we start with valid
+potentials, and update to preserve this, dijkstra never encounters negative edge
+weights, eliminating the possibility of negative cycles.
+This assumes no negative cycle existed in the graph to begin with.
+
+
+
+# The core here is using the dijkstras to find augmenting paths.
+# How does this compare to the normal maxflow? 
+
+Here, our focus lies on finding the cheapest path that increases flow.
+This path may not be the path that increases flow the most.
+Dijkstra is a good choice for this, as it can find the shortest path in terms of cost.
+*/
 
 using namespace std;
 
@@ -199,7 +253,7 @@ public:
         while (total_flow < K) {
             dijkstra(src, adj, dist, parent, potentials);
 
-            // Check if no augmenting paths
+            // Check if no shortest path
             if (dist[sink] == INF) {
                 break;
             }
@@ -215,7 +269,7 @@ public:
                 potentials[i] += dist[i];
             }
 
-            // Find max flow on augmenting path
+            // Find max flow on shortest path
             int f = K - total_flow;
             int curr = sink;
             while (curr != src) {

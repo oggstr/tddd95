@@ -7,17 +7,39 @@ import sys
 """
 
 """
-Solves a system of two linear congruences
+Solves a system of TWO linear congruences
 using a general solution of Chinese Remainder Theorem.
 
 Reference: https://en.wikipedia.org/wiki/Chinese_remainder_theorem
 
+Theory:
+As the assignment requires only a solution for two linear congruences,
+we implement a direct solution given by (derived through Bézout's identity):
+
+x = (avn + bum) / g
+
+where
+- x ≡ a (mod n)
+- x ≡ b (mod m)
+- g = um + vn = gcd(m, n) (Using the extended euclidean from previous assignment)
+
+In addition we may compute least common multiple (lcm) of n and m as:
+lcm = (n / g) * m
+
+Lastly, a solution only exists if
+a ≡ b (mod g) (or a % g == b % g)
+
 Algorithm:
-Implements a direct solution using Bézout's identity.
+1. Compute g, u, v = gcd(m, n)
+2. Check that solution exists: a % g == b % g
+3. Compute lcm = (n / g) * m
+4. Compute solution: sol = (a * v * n + b * u * m) / g
+5. Normalize solution to range [0, lcm]: sol %= lcm
+
 
 Time Complexity:
 - O(log(min(a, b))) for gcd computation
-- O(1) for the CRT solution
+- O(1) for the CRT solution (as we only have two equations)
 
 Space Complexity:
 - O(1)
@@ -48,34 +70,34 @@ def gcd(a: int, b: int) -> tuple[int, int, int]:
 
     return d, x, y
 
-def crt(a: int, n: int, b: int, m: int) -> tuple[int, int]:
+def crt(a: int, m: int, b: int, n: int) -> tuple[int, int]:
     """
     Solves a system of two linear congruences
     using a general solution of Chinese Remainder Theorem.
 
     Args:
         a (int): First congruence val
-        n (int): First modulus
+        m (int): First modulus
         b (int): Second congruence val
-        m (int): Second modulus
+        n (int): Second modulus
 
     Returns:
         tuple[int, int]: (solution, lcm), or (-1, -1) if no solution exists.
     """
     # General solution is given by:
-    # 
-    # z = (a * m * y + b * n * x) / g
-    # 
-    # where n * x + m * y = g = gcd(n, m)
-    # 
+    #
+    # x = (a*v*n + b*u*m) / g
+    #
+    # where g = u*m + v*n = gcd(n, m)
+    #
     # Source: https://en.wikipedia.org/wiki/Chinese_remainder_theorem#Generalization_to_non-coprime_moduli
-    g, x, y = gcd(n, m)
-    
+    g, u, v = gcd(m, n)
+
     if a % g != b % g:
         return -1, -1
 
-    lcm = (n // g) * m 
-    sol = (a * m * y + b * n * x) // g
+    lcm = m*n // g 
+    sol = (a*v*n + b*u*m) // g
     
     # Normalize solution to range [0, lcm]
     sol %= lcm

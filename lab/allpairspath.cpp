@@ -11,6 +11,8 @@
 /**
  * Floyd-Warshall algorithm
  *
+ * reference: https://cp-algorithms.com/graph/all-pair-shortest-path-floyd-warshall.html
+ *
  * @note There are no requirements on path reconstruction here. Therefore
  * we skip a proper representation of the graph entirely. Instead we just
  * use a distance matrix and insert new edges directly into it - thereby also
@@ -18,12 +20,25 @@
  *
  * Algorithm:
  *
- * Standard Floyd-Warshall algorithm with support for negative weights and cycles.
- * In the constructor we initialize the distance matrix with INF and 0 on the diagonal.
- * Adding an edge is done directly by setting the distance matrix entry to the edge weight.
- * The run() method then performs the standard Floyd-Warshall algorithm.
- * 
- * reference: https://cp-algorithms.com/graph/all-pair-shortest-path-floyd-warshall.html
+ * Floyd-Warshall algorithm with support for negative weights and cycles.
+ * The algorithm uses a dynamic programming approach. Throughout the algorithm,
+ * we maintain a distance matrix d where d[i][j] is the current shortest distance
+ * from i to j, given that we can use any intermediate nodes up to some k.
+ *
+ * Initialization
+ * 1. Start by initializing a distance matrix with infinity. (Performed by constructor)
+ * 2. Set the distance from each node to itself to 0. (Performed by constructor)
+ * 3. For each edge (u, v) with weight w, set d[u][v] = min(d[u][v], w). (Performed by addEdge)
+ *
+ * Core alg (Performed by run())
+ * 4. For each k from 0 to n-1, iterate over all pair of nodes (i, j)
+ * 5. Update the distance matrix: d[i][j] = min(d[i][j], d[i][k] + d[k][j])
+ *    Essentially, check if we can improve the distance from i to j by introducing a new node k.
+ *
+ * Negative cycle detection after running the algorithm
+ * 5. For each k from 0 to n-1, iterate over all pair of nodes (i, j)
+ * 6. Check if the distance between i and j can still be improved through k
+ * 7. If it can, it's part of a negative cycle, so set d[i][j] = -INF
  *
  * Time complexity:
  *
@@ -50,7 +65,7 @@ public:
     int n;
 
     /**
-     * Adjacency/distance matrix
+     * Distance matrix
      */
     vector<vector<int>> dist;
 

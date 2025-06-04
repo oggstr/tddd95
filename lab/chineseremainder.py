@@ -12,19 +12,58 @@ to solve systems of linear congruences.
 
 reference: https://cp-algorithms.com/algebra/chinese-remainder-theorem.html
 
+Theory:
+The Chinese Remainder Theorem states that given a system of linear congruences:
+x ≡ a_i (mod m_i)  i = 1,2 ... n
+
+A solution exists if all m_i are pairwise coprime.
+The solution can be found using:
+
+x = sum(a_i * M_i * N_i) mod M
+where:
+- M = prod(m_i) i = 1,2 ... n
+- M_i = M / m_i
+- N_i = modular inverse of M_i mod m_i
+
+The algorithm computes this solution iteratively.
+The modular inverse is found using the Extended Euclidean Algorithm.
+
+Since the the Euclidean algorithm gives us:
+a*x + b*y = gcd(a, b)
+
+We can find the modular inverse x, of a mod m from
+a*x + m*y = gcd(a, m) = 1, since m and a are coprime
+
+Proof:
+a*x + m*y ≡ 1 (mod m)
+a*x + 0   ≡ 1 (mod m)
+a*x       ≡ 1 (mod m)
+
+Since the Euclidean may return a negative x,
+we ensure the result is positive by taking
+x = (x % m + m) % m
+
 Algorithm:
-Direct implementation of Chinese Remainder Theorem. 
+1. Compute M = prod(m_i)
+2. For each equation (a_i, m_i):
+3. Compute M_i = M / m_i
+4. Compute N_i = mod_inv(M_i, m_i)
+5. Update result: res += (a_i * M_i * N_i)
+6. Compute final result: res %= M
 
 Time Complexity:
 - O(n) amount of iterations for n equations
 - O(log(min(a, m))) for gcd computation
 
+
 Total: O(n * log(min(a, m)))
 where n is the number of equations and a and m
 are the largest values in the equations (x ≡ a (mod m)).
 
+
 Space Complexity:
 - O(1)
+
 
 Usage:
 Modules terms must be pairwise coprime.
@@ -55,7 +94,8 @@ def gcd(a: int, b: int) -> tuple[int, int, int]:
     return d, x, y
 
 def mod_inv(a: int, m: int) -> int:
-    """Find modular inverse of a mod m
+    """Find modular inverse of:
+    a mod m
 
     Args:
         a (int): Number
@@ -94,8 +134,9 @@ def crt(equations: list[Congruence]) -> int:
         Mi = M // m
         Ni = mod_inv(Mi, m)
 
-        res = (res + (a * Mi * Ni) % M) % M
+        res += (a * Mi * Ni)
 
+    res %= M
     return res
 
 def main():

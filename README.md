@@ -8,4 +8,4 @@ If you're looking to plagiarise; don't. Nothing here is very hard to learn. In f
 
 ## Structure & Docs
 
-There is no real structure and documentation varies. All lab solutions include some theory in a comment at the top and should be well documented. Labs, on ther other hand, vary. Don't get your hopes up.
+There is no real structure and documentation varies. All lab solutions include some theory in a comment at the top and should be well documented. Exercises, on ther other hand, vary. Don't get your hopes up.
